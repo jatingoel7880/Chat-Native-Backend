@@ -58,27 +58,33 @@ socket.on('disconnect', () => {
   });
 
   socket.on('sendDirectMessage', (data) => {
-  const { text, senderId, receiverId, senderName, time } = data;
-
-  const message = {
+ const message = {
     id: createUniqueId(),
-    text,
-    senderId,
-    receiverId,
-    senderName,
-    time,
+    text: data.text,
+    senderId: data.senderId,
+    receiverId: data.receiverId,
+    senderName: data.senderName,
+    time: data.time,
   };
 
-  const key = [senderId, receiverId].sort().join('_');
+  const key = [data.senderId, data.receiverId].sort().join('_');
   if (!chatHistory[key]) chatHistory[key] = [];
   chatHistory[key].push(message);
 
   // Send to both sender and receiver if they are connected
-  const senderSocketId = userSocketMap[senderId];
-  const receiverSocketId = userSocketMap[receiverId];
+//   const senderSocketId = userSocketMap[senderId];
+//   const receiverSocketId = userSocketMap[receiverId];
 
-  if (senderSocketId) socketIO.to(senderSocketId).emit('receiveDirectMessage', message);
-  if (receiverSocketId) socketIO.to(receiverSocketId).emit('receiveDirectMessage', message);
+//   if (senderSocketId) socketIO.to(senderSocketId).emit('receiveDirectMessage', message);
+//   if (receiverSocketId) socketIO.to(receiverSocketId).emit('receiveDirectMessage', message);
+// });
+ const receiverSocketId = userSocketMap[data.receiverId];
+  if (receiverSocketId) {
+    socketIO.to(receiverSocketId).emit('receiveDirectMessage', message);
+  }
+  
+  // Send confirmation to sender
+  socket.emit('messageDelivered', message);
 });
 
   
