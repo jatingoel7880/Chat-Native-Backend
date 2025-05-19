@@ -34,7 +34,10 @@ socketIO.on("connection", (socket) => {
   console.log(`${socket.id} user is just connected`);
 
   socket.on('userConnected', (userId) => {
+    // to bind userId with socket.id
   userSocketMap[userId] = socket.id;
+  console.log(userId)
+  console.log(socket.id)
   console.log(`User connected: ${userId} -> ${socket.id}`);
 });
 
