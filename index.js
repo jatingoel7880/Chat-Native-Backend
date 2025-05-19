@@ -18,6 +18,7 @@ const socketIO = require("socket.io")(http, {
 const PORT = 4000;
 let chatgroups = [];
 const chatHistory = {}; // key: 'userA_userB' -> array of messages
+const userSocketMap = {};
 
 function createUniqueId() {
   return Math.random().toString(20).substring(2, 10);
@@ -32,6 +33,21 @@ app.use(cors({ origin: "*" }));
 socketIO.on("connection", (socket) => {
   console.log(`${socket.id} user is just connected`);
 
+  socket.on('userConnected', (userId) => {
+  userSocketMap[userId] = socket.id;
+  console.log(`User connected: ${userId} -> ${socket.id}`);
+});
+
+socket.on('disconnect', () => {
+  for (const [userId, sockId] of Object.entries(userSocketMap)) {
+    if (sockId === socket.id) {
+      delete userSocketMap[userId];
+      break;
+    }
+  }
+});
+
+
   socket.on('loadDirectChat', ({ senderId, receiverId }) => {
     const key = [senderId, receiverId].sort().join('_');
     const messages = chatHistory[key] || [];
@@ -39,31 +55,56 @@ socketIO.on("connection", (socket) => {
   });
 
   socket.on('sendDirectMessage', (data) => {
-    const {
-      text,
-      senderId,
-      receiverId,
-      senderName,
-      time,
-    } = data;
+  const { text, senderId, receiverId, senderName, time } = data;
 
-    const message = {
-      id: createUniqueId(),
-      text,
-      senderId,
-      receiverId,
-      senderName,
-      time,
-    };
+  const message = {
+    id: createUniqueId(),
+    text,
+    senderId,
+    receiverId,
+    senderName,
+    time,
+  };
 
-    const key = [senderId, receiverId].sort().join('_');
-    if (!chatHistory[key]) chatHistory[key] = [];
-    chatHistory[key].push(message);
+  const key = [senderId, receiverId].sort().join('_');
+  if (!chatHistory[key]) chatHistory[key] = [];
+  chatHistory[key].push(message);
 
-    // Use socketIO instead of io
-    socketIO.to(senderId).emit('receiveDirectMessage', message);
-    socketIO.to(receiverId).emit('receiveDirectMessage', message);
-  });
+  // Send to both sender and receiver if they are connected
+  const senderSocketId = userSocketMap[senderId];
+  const receiverSocketId = userSocketMap[receiverId];
+
+  if (senderSocketId) socketIO.to(senderSocketId).emit('receiveDirectMessage', message);
+  if (receiverSocketId) socketIO.to(receiverSocketId).emit('receiveDirectMessage', message);
+});
+
+  
+  // socket.on('sendDirectMessage', (data) => {
+  //   const {
+  //     text,
+  //     senderId,
+  //     receiverId,
+  //     senderName,
+  //     time,
+  //   } = data;
+
+  //   const message = {
+  //     id: createUniqueId(),
+  //     text,
+  //     senderId,
+  //     receiverId,
+  //     senderName,
+  //     time,
+  //   };
+
+  //   const key = [senderId, receiverId].sort().join('_');
+  //   if (!chatHistory[key]) chatHistory[key] = [];
+  //   chatHistory[key].push(message);
+
+  //   // Use socketIO instead of io
+  //   socketIO.to(senderId).emit('receiveDirectMessage', message);
+  //   socketIO.to(receiverId).emit('receiveDirectMessage', message);
+  // });
 });
 
 app.get("/api", (req, res) => {
